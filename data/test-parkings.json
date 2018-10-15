@@ -1,0 +1,14 @@
+[
+  {
+    "parkingId": "parking01",
+    "name": "parking 1"
+  },
+  {
+    "parkingId": "parking02",
+    "name": "parking 2"
+  },
+  {
+    "parkingId": "parking03",
+    "name": "parking 3"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "parkingId": "parking01",
+    "reservationDate":"2018-11-02",
+    "userId": "test01",
+    "id":"uuid01"
+  },
+  {
+    "parkingId": "parking01",
+    "reservationDate":"2018-11-05",
+    "userId": "test01",
+    "id":"uuid02"
+  },
+  {
+    "parkingId": "parking01",
+    "reservationDate":"2018-11-21",
+    "userId": "test01",
+    "id":"uuid03"
+  },
+  {
+    "parkingId": "parking01",
+    "reservationDate":"2018-12-03",
+    "userId": "test01",
+    "id":"uuid04"
+  },
+  {
+    "parkingId": "parking02",
+    "reservationDate":"2018-11-05",
+    "userId": "test01",
+    "id":"uuid05"
+  }
+]

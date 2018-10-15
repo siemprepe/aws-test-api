@@ -95,9 +95,7 @@ function register(body) {
           userId: body.userId,
         },
       }).promise()
-    )
-      //User.findOne({ email: body.email }) // check if user exists
-    )
+    ))
     .then(user => {
       console.log("USERXXX1: " + util.inspect(user))
       return user.userId
@@ -112,15 +110,14 @@ function register(body) {
           name: body.name,
           email: body.email,
           password: hash
-        }}).promise()
-      //User.create({ name: body.name, email: body.email, password: hash })
-      // create the new user
+        },
+        ReturnValues: 'ALL_OLD'
+      }).promise()
     )
     .then(user => {
       console.log("USERXXXXX: " + util.inspect(user))
       return { auth: true, token: signToken(body.userId) }
     })
-    // sign the token and send it back
 }
 
 function checkIfInputIsValid(body){
