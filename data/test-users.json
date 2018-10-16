@@ -1,17 +1,16 @@
 [
   {
-    "userId": "test01",
-    "name": "Jos",
-    "test": "01"
+    "userId": "user01",
+    "name": "user01",
+    "email": "user01@testing.com",
+    "password":"$2a$08$XCiQqBMfULYtsyLJ.ePuNeTS0agxqx.c3vIKJ1EmWS9SUE4OproFS",
+    "roles":["MEMBER","ADMIN"]
   },
   {
-    "userId": "test02",
-    "name": "Bert",
-    "test": "02"
-  },
-  {
-    "userId": "test03",
-    "name": "Piet",
-    "test": "03"
+    "userId": "user02",
+    "name": "user02",
+    "email": "user02@testing.com",
+    "password":"$2a$08$XCiQqBMfULYtsyLJ.ePuNeTS0agxqx.c3vIKJ1EmWS9SUE4OproFS",
+    "roles":["MEMBER"]
   }
 ]

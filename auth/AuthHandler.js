@@ -46,6 +46,7 @@ app.post('/login', function(req, res){
 })
 
 function login(body) {
+  var rootUser = {};
   return dynamoDb.get({
             TableName: USERS_TABLE,
             Key: {
@@ -55,33 +56,39 @@ function login(body) {
     .then(user => {
       console.log("LOGINUSER: " + util.inspect(user))
       console.log("LOGINUSER: " + body.password)
-      return !user.Item.userId
+      rootUser = user;
+      return user.Item === undefined || !user.Item.userId
         ? Promise.reject(new Error('User not found'))
-        : comparePassword(body.password, user.Item.password, user.Item.userId)
-    }
-
-    )
-    .then(token => ({ auth: true, token: token }));
+        : comparePassword(body.password, user.Item.password, user.Item)
+    })
+    .then(token => ({ auth: true,
+                      token: token,
+                      userId: rootUser.Item.userId,
+                      name: rootUser.Item.name,
+                      email: rootUser.Item.email,
+                      roles: rootUser.Item.roles
+                    })
+        );
 }
 
-function comparePassword(inputPassword, userPassword, userId) {
+function comparePassword(inputPassword, userPassword, user) {
   console.log("comparing " + inputPassword + " - " + userPassword)
   return bcrypt.compare(inputPassword, userPassword)
     .then(passwordIsValid =>
       !passwordIsValid
         ? Promise.reject(new Error('The credentials do not match.'))
-        : signToken(userId)
+        : signToken(user)
     );
 }
 
 app.get('/testuser', function(req, res){
   let principal = req.context.authorizer.principalId
   let claims = req.context.authorizer.claims
-  res.json({user: principal, claims: JSON.stringify(claims)});
+  res.json({user: principal, claims: claims});
 })
 
-function signToken(id) {
-  return jwt.sign({ id: id }, process.env.JWT_SECRET, {
+function signToken(user) {
+  return jwt.sign({ id: user.userId,roles:user.roles }, process.env.JWT_SECRET, {
     expiresIn: 86400 // expires in 24 hours
   });
 }
@@ -102,7 +109,8 @@ function register(body) {
         ? Promise.reject(new Error('User with that userId exists.'))
         : bcrypt.hash(body.password, 8) // hash the pass
     })
-    .then(hash =>
+    .then(hash => {
+      console.log("PASSHASH " + hash)
       dynamoDb.put({
         TableName: USERS_TABLE,
         Item: {
@@ -113,9 +121,10 @@ function register(body) {
         },
         ReturnValues: 'ALL_OLD'
       }).promise()
-    )
+    })
     .then(user => {
       console.log("USERXXXXX: " + util.inspect(user))
+      //SIGNTOKEN is broken for register (need to pass user with roles)
       return { auth: true, token: signToken(body.userId) }
     })
 }
