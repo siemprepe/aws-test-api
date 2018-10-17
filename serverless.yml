@@ -90,6 +90,7 @@ functions:
           path: parkings
           method: get
           cors: true
+          authorizer: verify-token
   addParking:
     handler: parkings/ParkingsHandler.handler
     events:
@@ -97,6 +98,7 @@ functions:
           path: parkings
           method: post
           cors: true
+          authorizer: verify-token
   getReservations:
     handler: reservations/ReservationsHandler.handler
     events:
@@ -104,6 +106,7 @@ functions:
           path: reservations/{proxy+}
           method: get
           cors: true
+          authorizer: verify-token
   addReservation:
     handler: reservations/ReservationsHandler.handler
     events:
@@ -111,7 +114,15 @@ functions:
           path: reservations
           method: post
           cors: true
-
+          authorizer: verify-token
+  deleteReservation:
+    handler: reservations/ReservationsHandler.handler
+    events:
+      - http:
+          path: reservations/{proxy+}
+          method: delete
+          cors: true
+          authorizer: verify-token
 resources:
   Resources:
     UsersDynamoDBTable:

@@ -45,6 +45,31 @@ app.post('/reservations', function(req,res){
       res.status(err.statusCode || 500).json({ error: err.message })
     );
 })
+app.delete('/reservations/:parking/:date', function(req,res){
+  const {date, parking} = req.params;
+  console.log(`Delete Reservation on ${date} for ${parking}`);
+  return deleteReservation(date, parking)
+    .then(session =>
+      res.json(session)
+    )
+    .catch(err =>
+      res.status(err.statusCode || 500).json({ error: err.message })
+    );
+})
+
+function deleteReservation(date, parking){
+  return dynamoDb.delete({
+    TableName : RESERVATIONS_TABLE,
+    Key: {
+      parkingId: parking,
+      reservationDate: date
+    }
+  }).promise()
+  .then(result => {
+    return {success: true}
+  });
+}
+
 function addReservation(body) {
   return checkIfInputIsValid(body) // validate input
     .then(() => (
