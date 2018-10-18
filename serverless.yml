@@ -1,17 +1,4 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-service: siemprepe-test-api # NOTE: update this with your service name
+service: siemprepe-test-api
 
 plugins:
   - serverless-dynamodb-local
@@ -20,6 +7,7 @@ plugins:
 custom:
   secrets: ${file(secrets.json)}
   usersTableName: 'users-table-${self:provider.stage}'
+  registrationTableName: 'registration-table-${self:provider.stage}'
   parkingsTableName: 'parkings-table-${self:provider.stage}'
   reservationsTableName: 'reservations-table-${self:provider.stage}'
   dynamodb:
@@ -52,8 +40,13 @@ provider:
         - dynamodb:DeleteItem
       Resource:
         - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+    - Effect: "Allow"
+      Action:
+        - "ses:SendEmail"
+      Resource: "*"
   environment:
     USERS_TABLE: ${self:custom.usersTableName}
+    REGISTRATION_TABLE: ${self:custom.registrationTableName}
     PARKINGS_TABLE: ${self:custom.parkingsTableName}
     RESERVATIONS_TABLE: ${self:custom.reservationsTableName}
     JWT_SECRET: ${self:custom.secrets.JWT_SECRET}
@@ -67,6 +60,13 @@ functions:
       - http:
           path: register
           method: post
+          cors: true
+  activateRegistration:
+    handler: auth/AuthHandler.handler
+    events:
+      - http:
+          path: register/activate/{proxy+}
+          method: get
           cors: true
   login:
     handler: auth/AuthHandler.handler
@@ -123,6 +123,13 @@ functions:
           method: delete
           cors: true
           authorizer: verify-token
+  send:
+    handler: auth/AuthHandler.handler
+    events:
+      - http:
+          path: email/send
+          method: post
+          cors: true
 resources:
   Resources:
     UsersDynamoDBTable:
@@ -140,6 +147,21 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.usersTableName}
+    RegistrationDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: token
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: token
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.registrationTableName}
     ParkingsDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:

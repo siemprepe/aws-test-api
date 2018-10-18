@@ -1,24 +1,31 @@
 const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
 const express = require('express')
-const app = express()
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs-then');
 const util = require('util')
+const uuidv1 = require('uuid/v1')
+
+const app = express()
 
 const USERS_TABLE = process.env.USERS_TABLE;
+const REGISTRATION_TABLE = process.env.REGISTRATION_TABLE;
 
 const IS_OFFLINE = process.env.IS_OFFLINE;
 let dynamoDb;
+let ses;
 if (IS_OFFLINE === 'true') {
   dynamoDb = new AWS.DynamoDB.DocumentClient({
     region: 'localhost',
     endpoint: 'http://localhost:8000'
   })
   console.log(dynamoDb);
+  ses = new AWS.SES({endpoint: 'http://localhost:9001'})
+  console.log(ses);
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
+  ses = new AWS.SES();
 };
 
 app.use(bodyParser.json({ strict: false }));
@@ -26,6 +33,17 @@ app.use(bodyParser.json({ strict: false }));
 app.post('/register', function(req, res){
   console.log("REGISTER: " + JSON.stringify(req.body))
   return register(req.body)
+    .then(session =>
+      res.json(session)
+    )
+    .catch(err =>
+      res.status(err.statusCode || 500).json({ error: err.message })
+    );
+})
+
+app.get('/register/activate/:token', function(req, res){
+  console.log("ACTIVATE: " + JSON.stringify(req.params.token))
+  return activateRegistration(req.params.token)
     .then(session =>
       res.json(session)
     )
@@ -93,9 +111,11 @@ function signToken(user) {
   });
 }
 
-function register(body) {
-  return checkIfInputIsValid(body) // validate input
-    .then(() => (
+function register(body){
+  const {userId, email, password, name} = body;
+  let rootToken;
+  return checkIfInputIsValid(body)
+  .then(() => (
       dynamoDb.get({
         TableName: USERS_TABLE,
         Key: {
@@ -103,55 +123,145 @@ function register(body) {
         },
       }).promise()
     ))
-    .then(user => {
-      console.log("USERXXX1: " + util.inspect(user))
-      return user.userId
-        ? Promise.reject(new Error('User with that userId exists.'))
-        : bcrypt.hash(body.password, 8) // hash the pass
-    })
-    .then(hash => {
-      console.log("PASSHASH " + hash)
-      dynamoDb.put({
-        TableName: USERS_TABLE,
-        Item: {
-          userId: body.userId,
-          name: body.name,
-          email: body.email,
-          password: hash
-        },
-        ReturnValues: 'ALL_OLD'
-      }).promise()
-    })
-    .then(user => {
-      console.log("USERXXXXX: " + util.inspect(user))
-      //SIGNTOKEN is broken for register (need to pass user with roles)
-      return { auth: true, token: signToken(body.userId) }
-    })
+  .then(user => {
+    console.log(`Ùser found: ${util.inspect(user)}`);
+    if(user === undefined || user === null || !user.userId){
+      return bcrypt.hash(body.password, 8);
+    }else{
+      return Promise.reject(new Error('UserId already taken'))
+    }
+  })
+  .then(hash => {
+    const {token,expiration} = buildRegistration();
+    rootToken = token;
+    dynamoDb.put({
+      TableName: REGISTRATION_TABLE,
+      Item: {
+        userId: userId,
+        name: name,
+        email: email,
+        password: hash,
+        token: token,
+        expiration: expiration
+      },
+      ReturnValues: 'ALL_OLD'
+    }).promise()
+  })
+  .then(registration => {
+    sendEmail(userId,email, rootToken)
+  })
+  .then(msg => {
+    console.log("MAILSENT" + msg)
+    return { success: true}
+  })
+}
+
+function buildRegistration(){
+  return {token: uuidv1(), expiration: new Date().getTime() + 24 * 60 * 60 * 1000};
+}
+
+function sendEmail(userId, email, token) {
+  var params = {
+    Destination: {
+      CcAddresses: ['noreply@cgi.com'],
+      ToAddresses: [email]
+    },
+    Message: {
+      Body: {
+        // Html: {
+        //  Charset: "UTF-8",
+        //  Data: "HTML_FORMAT_BODY"
+        // },
+        Text: {
+         Charset: "UTF-8",
+         Data: `Hello ${userId}, activate here http://localhost/register/activate/${token}`
+        }
+       },
+       Subject: {
+        Charset: 'UTF-8',
+        Data: 'Test email'
+       }
+      },
+    Source: 'noreply@cgi.com',
+    ReplyToAddresses: ['noreply@cgi.com']
+  };
+  return ses.sendEmail(params).promise();
+}
+
+function activateRegistration(token){
+  console.log(`Looking up reg ${token}`)
+  return dynamoDb.get({
+            TableName: REGISTRATION_TABLE,
+            Key: {
+              token: token
+            }
+          }).promise()
+          .then(registration => {
+            console.log("registration: " + util.inspect(registration))
+            if(registration === undefined || registration === null || !registration.Item){
+              return Promise.reject(new Error('Activation Token not valid'))
+            }else{
+              return checkRegistration(registration)
+            }
+          })
+          .then(registration => {
+            let item = {
+              userId: registration.Item.userId,
+              name: registration.Item.name,
+              email: registration.Item.email,
+              password: registration.Item.password,
+              roles: ['MEMBER']
+            };
+            dynamoDb.put({
+              TableName: USERS_TABLE,
+              Item: item,
+              ReturnValues: 'ALL_OLD'
+            }).promise()
+            return item
+          })
+            .then(user => {
+              console.log("USER CREATED: " + util.inspect(user))
+              return { auth: true,
+                        token: signToken(user),
+                        userId: user.userId,
+                        name: user.name,
+                        email: user.email,
+                        roles: user.roles
+                      }
+            })
+}
+
+function checkRegistration(registration){
+  const { expiration } = registration;
+  let exp = new Date(expiration);
+  let now = new Date();
+  if(exp.getTime() > now.getTime()){
+    console.log("TOKEN HAS EXPIRED");
+    return Promise.reject(new Error('Activation Token has expired'))
+  }else{
+    console.log("TOKEN IS VALID")
+    return registration;
+  }
 }
 
 function checkIfInputIsValid(body){
+  const {userId, email, password} = body;
   if (
-    !(body.password &&
-      body.password.length >= 7)
+    !(password &&
+      password.length >= 7)
   ) {
     return Promise.reject(new Error('Password error. Password needs to be longer than 8 characters.'));
   }
 
   if (
-    !(body.userId &&
-      body.userId.length > 5 &&
-      typeof body.userId === 'string')
+    !(userId &&
+      userId.length > 5 &&
+      typeof userId === 'string')
   ) return Promise.reject(new Error('UserId error. UserId needs to longer than 5 characters'));
-
+  //TODO: validate email correctly
   if (
-    !(body.name &&
-      body.name.length > 5 &&
-      typeof body.name === 'string')
-  ) return Promise.reject(new Error('Username error. Username needs to longer than 5 characters'));
-
-  if (
-    !(body.email &&
-      typeof body.email === 'string')
+    !(email &&
+      typeof email === 'string')
   ) return Promise.reject(new Error('Email error. Email must have valid characters.'));
   return Promise.resolve();
 }
