@@ -1,1 +1,0 @@
-Hello testing11, activate here http://localhost:4200/activation/787f4c00-d6a0-11e8-b7ba-c5b893354514
