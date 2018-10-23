@@ -1,0 +1,6 @@
+Subject: Test email
+To Address: jos@cgi.com
+Cc Address: noreply@cgi.com
+Bcc Address: undefined
+Reply To Address: noreply@cgi.com
+Source: noreply@cgi.com

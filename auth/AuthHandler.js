@@ -161,6 +161,7 @@ function buildRegistration(){
 }
 
 function sendEmail(userId, email, token) {
+  const deploy_url = process.env.DEPLOY_URL;
   var params = {
     Destination: {
       CcAddresses: ['noreply@cgi.com'],
@@ -174,7 +175,7 @@ function sendEmail(userId, email, token) {
         // },
         Text: {
          Charset: "UTF-8",
-         Data: `Hello ${userId}, activate here http://localhost/register/activate/${token}`
+         Data: `Hello ${userId}, activate here ${deploy_url}/activation/${token}`
         }
        },
        Subject: {
@@ -250,19 +251,20 @@ function checkIfInputIsValid(body){
     !(password &&
       password.length >= 7)
   ) {
-    return Promise.reject(new Error('Password error. Password needs to be longer than 8 characters.'));
+    return Promise.reject(new Error('Password needs to be longer than 8 characters'));
   }
 
   if (
     !(userId &&
       userId.length > 5 &&
       typeof userId === 'string')
-  ) return Promise.reject(new Error('UserId error. UserId needs to longer than 5 characters'));
-  //TODO: validate email correctly
+  ) return Promise.reject(new Error('Username needs to longer than 5 characters'));
+
   if (
     !(email &&
-      typeof email === 'string')
-  ) return Promise.reject(new Error('Email error. Email must have valid characters.'));
+      typeof email === 'string' &&
+      email.includes('@cgi.com'))
+  ) return Promise.reject(new Error('Email is not valid'));
   return Promise.resolve();
 }
 

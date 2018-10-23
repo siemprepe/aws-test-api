@@ -50,6 +50,7 @@ provider:
     PARKINGS_TABLE: ${self:custom.parkingsTableName}
     RESERVATIONS_TABLE: ${self:custom.reservationsTableName}
     JWT_SECRET: ${self:custom.secrets.JWT_SECRET}
+    DEPLOY_URL: ${file(secrets.json):${opt:stage, self:provider.stage}.DEPLOY_URL}
 
 functions:
   verify-token:
