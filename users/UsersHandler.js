@@ -1,8 +1,8 @@
 const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
-const express = require('express')
-const app = express()
+const express = require('express');
 const AWS = require('aws-sdk');
+const app = express();
 
 const USERS_TABLE = process.env.USERS_TABLE;
 
@@ -17,6 +17,12 @@ if (IS_OFFLINE === 'true') {
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
+
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 app.use(bodyParser.json({ strict: false }));
 

@@ -25,17 +25,23 @@ if (IS_OFFLINE === 'true') {
   console.log(ses);
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
-  ses = new AWS.SES();
+  ses = new AWS.SES({ apiVersion: "2010-12-01" });
 };
+
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 app.use(bodyParser.json({ strict: false }));
 
 app.post('/register', function(req, res){
   console.log("REGISTER: " + JSON.stringify(req.body))
   return register(req.body)
-    .then(session =>
-      res.json(session)
-    )
+    .then(session => {
+        res.json(session)
+    })
     .catch(err =>
       res.status(err.statusCode || 500).json({ error: err.message })
     );
@@ -99,12 +105,6 @@ function comparePassword(inputPassword, userPassword, user) {
     );
 }
 
-app.get('/testuser', function(req, res){
-  let principal = req.context.authorizer.principalId
-  let claims = req.context.authorizer.claims
-  res.json({user: principal, claims: claims});
-})
-
 function signToken(user) {
   return jwt.sign({ id: user.userId,roles:user.roles }, process.env.JWT_SECRET, {
     expiresIn: 86400 // expires in 24 hours
@@ -134,7 +134,7 @@ function register(body){
   .then(hash => {
     const {token,expiration} = buildRegistration();
     rootToken = token;
-    dynamoDb.put({
+    let params = {
       TableName: REGISTRATION_TABLE,
       Item: {
         userId: userId,
@@ -145,13 +145,13 @@ function register(body){
         expiration: expiration
       },
       ReturnValues: 'ALL_OLD'
-    }).promise()
+    };
+    return dynamoDb.put(params).promise()
   })
   .then(registration => {
-    sendEmail(userId,email, rootToken)
+    return sendEmail(userId,email, rootToken)
   })
   .then(msg => {
-    console.log("MAILSENT" + msg)
     return { success: true}
   })
 }
@@ -164,7 +164,7 @@ function sendEmail(userId, email, token) {
   const deploy_url = process.env.DEPLOY_URL;
   var params = {
     Destination: {
-      CcAddresses: ['noreply@cgi.com'],
+      CcAddresses: ['cgibeparking@gmail.com'],
       ToAddresses: [email]
     },
     Message: {
@@ -183,14 +183,16 @@ function sendEmail(userId, email, token) {
         Data: 'Test email'
        }
       },
-    Source: 'noreply@cgi.com',
-    ReplyToAddresses: ['noreply@cgi.com']
+    Source: 'cgibeparking@gmail.com',
+    ReplyToAddresses: ['cgibeparking@gmail.com'],
+    ReturnPath: 'cgibeparking@gmail.com'
   };
   return ses.sendEmail(params).promise();
 }
 
 function activateRegistration(token){
   console.log(`Looking up reg ${token}`)
+  var rootUser;
   return dynamoDb.get({
             TableName: REGISTRATION_TABLE,
             Key: {
@@ -211,23 +213,33 @@ function activateRegistration(token){
               name: registration.Item.name,
               email: registration.Item.email,
               password: registration.Item.password,
-              roles: ['MEMBER']
+              roles: 'MEMBER'
             };
-            dynamoDb.put({
+            let params = {
               TableName: USERS_TABLE,
               Item: item,
               ReturnValues: 'ALL_OLD'
-            }).promise()
-            return item
+            }
+            rootUser = item;
+            return dynamoDb.put(params).promise();
+          })
+          .then(() => {
+            let params = {
+                      TableName: REGISTRATION_TABLE,
+                      Key: {
+                        token: token
+                      }
+                    }
+            return dynamoDb.delete(params).promise();
           })
             .then(user => {
-              console.log("USER CREATED: " + util.inspect(user))
+              console.log("USER CREATED: " + util.inspect(rootUser))
               return { auth: true,
                         token: signToken(user),
-                        userId: user.userId,
-                        name: user.name,
-                        email: user.email,
-                        roles: user.roles
+                        userId: rootUser.userId,
+                        name: rootUser.name,
+                        email: rootUser.email,
+                        roles: rootUser.roles
                       }
             })
 }

@@ -4,13 +4,13 @@
     "name": "user01",
     "email": "user01@testing.com",
     "password":"$2a$08$XCiQqBMfULYtsyLJ.ePuNeTS0agxqx.c3vIKJ1EmWS9SUE4OproFS",
-    "roles":["MEMBER","ADMIN"]
+    "roles":"MEMBER;ADMIN"
   },
   {
     "userId": "user02",
     "name": "user02",
     "email": "user02@testing.com",
     "password":"$2a$08$XCiQqBMfULYtsyLJ.ePuNeTS0agxqx.c3vIKJ1EmWS9SUE4OproFS",
-    "roles":["MEMBER"]
+    "roles":"MEMBER"
   }
 ]

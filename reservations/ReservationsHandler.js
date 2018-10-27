@@ -1,11 +1,11 @@
 const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
-const express = require('express')
-const app = express()
+const express = require('express');
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
-const util = require('util')
-const uuidv1 = require('uuid/v1')
+const util = require('util');
+const uuidv1 = require('uuid/v1');
+const app = express();
 
 const RESERVATIONS_TABLE = process.env.RESERVATIONS_TABLE;
 const PARKINGS_TABLE = process.env.PARKINGS_TABLE;
@@ -21,6 +21,12 @@ if (IS_OFFLINE === 'true') {
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
+
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 app.use(bodyParser.json({ strict: false }));
 

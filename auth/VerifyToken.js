@@ -34,8 +34,9 @@ module.exports.auth = (event, context, callback) => {
     if (err)
       return callback(null, 'Unauthorized');
 
+    console.log("Token verified: " + decoded.roles);
     // if everything is good, save to request for use in other routes
     return callback(null, generatePolicy(decoded, 'Allow', event.methodArn))
   });
-
+  return callback(null, 'Unauthorized');
 };

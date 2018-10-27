@@ -28,7 +28,7 @@ provider:
   name: aws
   runtime: nodejs8.10
   stage: dev
-  region: eu-west-3
+  region: eu-west-1
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -40,6 +40,9 @@ provider:
         - dynamodb:DeleteItem
       Resource:
         - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["RegistrationDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["ParkingsDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["ReservationsDynamoDBTable", "Arn" ] }
     - Effect: "Allow"
       Action:
         - "ses:SendEmail"
@@ -55,6 +58,7 @@ provider:
 functions:
   verify-token:
     handler: auth/VerifyToken.auth
+    cors: true
   register:
     handler: auth/AuthHandler.handler
     events:
@@ -76,14 +80,6 @@ functions:
           path: login
           method: post
           cors: true
-  testuser:
-    handler: auth/AuthHandler.handler
-    events:
-      - http:
-          path: testuser
-          method: get
-          cors: true
-          authorizer: verify-token
   getParkings:
     handler: parkings/ParkingsHandler.handler
     events:
@@ -124,15 +120,26 @@ functions:
           method: delete
           cors: true
           authorizer: verify-token
-  send:
-    handler: auth/AuthHandler.handler
-    events:
-      - http:
-          path: email/send
-          method: post
-          cors: true
 resources:
   Resources:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    GatewayResponseDefault5XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
     UsersDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:

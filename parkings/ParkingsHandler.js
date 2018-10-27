@@ -1,10 +1,10 @@
 const serverless = require('serverless-http');
 const bodyParser = require('body-parser');
-const express = require('express')
-const app = express()
+const express = require('express');
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
-const util = require('util')
+const util = require('util');
+const app = express();
 
 const PARKINGS_TABLE = process.env.PARKINGS_TABLE;
 
@@ -20,15 +20,25 @@ if (IS_OFFLINE === 'true') {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
 
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
+
 app.use(bodyParser.json({ strict: false }));
 
 app.get('/parkings', function(req, res){
+  console.log("GET PARKINGS")
   return getAllParkings(req.body)
     .then(session =>
       res.json(session)
     )
-    .catch(err =>
+    .catch(err =>{
+      console.log("GET PARKINGS FAILED: " + util.inspect(err));
       res.status(err.statusCode || 500).json({ error: err.message })
+    }
+
     );
 })
 
@@ -37,18 +47,27 @@ function getAllParkings(body) {
             TableName: PARKINGS_TABLE,
           }).promise()
     .then(parkings => parkings.Items);
-    //.then(token => ({ auth: true, token: token }));
+}
+
+//Temporary role check on route. Better to use middleware component.
+function checkRole(roles, expectedRole){
+  return roles !== null ? roles.split(';').find(role => role === expectedRole) : false
 }
 
 app.post('/parkings', function(req,res){
   console.log("Add Parking: " + JSON.stringify(req.body))
-  return addParking(req.body)
-    .then(session =>
-      res.json(session)
-    )
-    .catch(err =>
-      res.status(err.statusCode || 500).json({ error: err.message })
-    );
+  if(checkRole(req.context.authorizer.roles, 'ADMIN')){
+    return addParking(req.body)
+      .then(session =>
+        res.json(session)
+      )
+      .catch(err =>
+        res.status(err.statusCode || 500).json({ error: err.message })
+      );
+  }else{
+    res.status(403).json({ error: 'Unauthorized' })
+  }
+
 })
 function addParking(body) {
   return checkIfInputIsValid(body) // validate input
