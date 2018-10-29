@@ -5,6 +5,7 @@ const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
 const util = require('util');
 const uuidv1 = require('uuid/v1');
+const roleCheckMiddleware = require('../auth/roleCheckMiddleware');
 const app = express();
 
 const RESERVATIONS_TABLE = process.env.RESERVATIONS_TABLE;
@@ -21,6 +22,9 @@ if (IS_OFFLINE === 'true') {
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
+
+var router = express.Router()
+roleCheckMiddleware.applyRoleCheckMiddleware(router);
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
@@ -41,7 +45,7 @@ app.get('/reservations/:date', function(req, res){
     );
 })
 
-app.post('/reservations', function(req,res){
+router.post('/reservations', function(req,res){
   console.log("Add Reservation: " + JSON.stringify(req.body))
   return addReservation(req.body)
     .then(session =>
@@ -51,7 +55,7 @@ app.post('/reservations', function(req,res){
       res.status(err.statusCode || 500).json({ error: err.message })
     );
 })
-app.delete('/reservations/:parking/:date', function(req,res){
+router.delete('/reservations/:parking/:date', function(req,res){
   const {date, parking} = req.params;
   console.log(`Delete Reservation on ${date} for ${parking}`);
   return deleteReservation(date, parking)
@@ -141,7 +145,6 @@ function isValidDate(dateString) {
 }
 
 function getAllReservations(date) {
-  //TODO: Process input date or let front give correct date
   return dynamoDb.scan({
             TableName: PARKINGS_TABLE,
           }).promise()
@@ -167,6 +170,8 @@ function queryReservation(id, date){
     return reservations.Items
   });
 }
+
+app.use('/', router);
 
 module.exports.handler = serverless(app, {
   request: function(request, event, context) {

@@ -4,6 +4,9 @@ This is a test project for me to play around with writing AWS Lambdas and storin
 ## Technologies used
 Node-js, Serverless framework, DynamoDB
 
+## Instructions
+d
+
 ## Lessons learned
 ### Custom authorizer
 Attributes added onto context of policy can not be of type array or object.

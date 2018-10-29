@@ -4,6 +4,7 @@ const express = require('express');
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
 const util = require('util');
+const roleCheckMiddleware = require('../auth/roleCheckMiddleware');
 const app = express();
 
 const PARKINGS_TABLE = process.env.PARKINGS_TABLE;
@@ -19,6 +20,10 @@ if (IS_OFFLINE === 'true') {
 } else {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
+
+var router = express.Router()
+roleCheckMiddleware.applyRoleCheckMiddleware(router);
+
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
@@ -49,26 +54,17 @@ function getAllParkings(body) {
     .then(parkings => parkings.Items);
 }
 
-//Temporary role check on route. Better to use middleware component.
-function checkRole(roles, expectedRole){
-  return roles !== null ? roles.split(';').find(role => role === expectedRole) : false
-}
-
-app.post('/parkings', function(req,res){
+router.post('/parkings', function(req,res){
   console.log("Add Parking: " + JSON.stringify(req.body))
-  if(checkRole(req.context.authorizer.roles, 'ADMIN')){
-    return addParking(req.body)
-      .then(session =>
-        res.json(session)
-      )
-      .catch(err =>
-        res.status(err.statusCode || 500).json({ error: err.message })
-      );
-  }else{
-    res.status(403).json({ error: 'Unauthorized' })
-  }
-
+  return addParking(req.body)
+    .then(session =>
+      res.json(session)
+    )
+    .catch(err =>
+      res.status(err.statusCode || 500).json({ error: err.message })
+    );
 })
+
 function addParking(body) {
   return checkIfInputIsValid(body) // validate input
     .then(() => (
@@ -115,22 +111,7 @@ function checkIfInputIsValid(body){
   return Promise.resolve();
 }
 
-function getAllReservations(date) {
-  //TODO: Process input date
-  return dynamoDb.scan({
-            TableName: PARKINGS_TABLE,
-          }).promise()
-    .then(parkings => {
-      let reservations = parkings.Items.map(parking => {
-        let test = queryReservation(parking.parkingId, date)
-        .then(reservation => {
-          return reservation;
-        })
-        return test;
-      })
-      return Promise.all(reservations).then(result => result)
-    });
-}
+app.use('/', router);
 
 module.exports.handler = serverless(app, {
   request: function(request, event, context) {
